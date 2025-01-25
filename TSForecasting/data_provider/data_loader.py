@@ -1,3 +1,96 @@
+# 在文件顶部导入必要的库
+import os
+import numpy as np
+import pandas as pd
+from torch.utils.data import Dataset
+from sklearn.preprocessing import StandardScaler
+from utils.timefeatures import time_features
+
+# 定义一个用于气象与就诊人数数据集的类
+class Dataset_Weather_People(Dataset):
+    def __init__(self, root_path, flag='train', size=None,
+                 features='S', data_path='气象与就诊人数.csv',
+                 target='people', scale=True, timeenc=0, freq='d'):
+        # size [seq_len, label_len, pred_len]
+        # 如果没有提供size参数，使用默认值
+        if size is None:
+            self.seq_len = 24 * 4 * 4  # 默认序列长度
+            self.label_len = 24 * 4  # 默认标签长度
+            self.pred_len = 24 * 4  # 默认预测长度
+        else:
+            self.seq_len, self.label_len, self.pred_len = size
+
+        self.features = features
+        self.target = target
+        self.scale = scale
+        self.timeenc = timeenc
+        self.freq = freq
+        self.set_type = flag
+
+        self.root_path = root_path
+        self.data_path = data_path
+        self.__read_data__()  # 调用数据读取方法
+
+    def __read_data__(self):
+        self.scaler = StandardScaler()  # 初始化标准化缩放器
+        df_raw = pd.read_csv(os.path.join(self.root_path, self.data_path))  # 读取CSV数据
+        print(f"原始数据行数: {len(df_raw)}")  # 打印原始数据行数
+
+        # 去除空行
+        df_raw.dropna(inplace=True)
+        print(f"去除空行后数据行数: {len(df_raw)}")  # 打印原始数据行数
+
+        # 处理时间特征，将'datetime'列转换为日期时间格式，并设置为索引
+        df_raw['date'] = pd.to_datetime(df_raw['datetime'])
+        df_raw = df_raw.set_index('date')
+
+        # 选择特征和目标列
+        cols = list(df_raw.columns)
+        cols.remove(self.target)  # 移除目标列
+        df_data = df_raw[cols + [self.target]]  # 重新组织数据列
+
+        # 数据标准化
+        if self.scale:
+            self.scaler.fit(df_data.values)  # 仅对训练集进行标准化
+            data = self.scaler.transform(df_data.values)
+        else:
+            data = df_data.values
+
+        # 定义数据集的边界
+        num_train = int(len(df_data) * 0.7)  # 70% 用于训练
+        num_test = int(len(df_data) * 0.2)  # 20% 用于测试
+        num_vali = len(df_data) - num_train - num_test  # 剩余用于验证
+        border1s = [0, num_train - self.seq_len, len(df_data) - num_test - self.seq_len]
+        border2s = [num_train, num_train + num_vali, len(df_data)]
+
+        # 根据数据集类型选择边界
+        border1 = border1s[self.set_type]
+        border2 = border2s[self.set_type]
+
+        # 提取输入数据、输出数据和时间标记
+        self.data_x = data[border1:border2]
+        self.data_y = data[border1:border2]
+        self.data_stamp = time_features(df_raw.index[border1:border2], freq=self.freq)
+
+    def __getitem__(self, index):
+        s_begin = index
+        s_end = s_begin + self.seq_len
+        r_begin = s_end - self.label_len
+        r_end = r_begin + self.label_len + self.pred_len
+
+        seq_x = self.data_x[s_begin:s_end]
+        seq_y = self.data_y[r_begin:r_end]
+        seq_x_mark = self.data_stamp[s_begin:s_end]
+        seq_y_mark = self.data_stamp[r_begin:r_end]
+
+        return seq_x, seq_y, seq_x_mark, seq_y_mark
+
+    def __len__(self):
+        return len(self.data_x) - self.seq_len - self.pred_len + 1
+
+
+
+
 import os
 import numpy as np
 import pandas as pd
@@ -42,13 +135,21 @@ class Dataset_ETT_hour(Dataset):
 
     def __read_data__(self):
         self.scaler = StandardScaler()  # 初始化标准化缩放器
-        df_raw = pd.read_csv(os.path.join(self.root_path,
-                                          self.data_path))  # 读取CSV数据
+        df_raw = pd.read_csv(os.path.join(self.root_path, self.data_path))
+        print(f"原始数据行数: {len(df_raw)}")
+        
+        # 去除空行
+        df_raw.dropna(inplace=True)
+        
+        # 根据数据量调整边界
+        total_data = len(df_raw)
+        train_size = int(total_data * 0.7)  # 70% 用于训练
+        val_size = int(total_data * 0.15)  # 15% 用于验证
+        test_size = total_data - train_size - val_size  # 剩余用于测试
 
-        # 定义数据集的边界
-        border1s = [0, 12 * 30 * 24 - self.seq_len, 12 * 30 * 24 + 4 * 30 * 24 - self.seq_len]
-        border2s = [12 * 30 * 24, 12 * 30 * 24 + 4 * 30 * 24, 12 * 30 * 24 + 8 * 30 * 24]
-        border1 = border1s[self.set_type]  # 根据数据集类型选择边界
+        border1s = [0, train_size, train_size + val_size]
+        border2s = [train_size, train_size + val_size, total_data]
+        border1 = border1s[self.set_type]
         border2 = border2s[self.set_type]
 
         # 根据特征类型选择数据列
@@ -82,6 +183,9 @@ class Dataset_ETT_hour(Dataset):
         self.data_x = data[border1:border2]  # 输入数据
         self.data_y = data[border1:border2]  # 输出数据
         self.data_stamp = data_stamp  # 时间标记
+
+        print(f"Data range for {self.set_type}: {border1} to {border2}")
+        print(f"Data length: {len(self.data_x)}")
 
     def __getitem__(self, index):
         s_begin = index
@@ -176,6 +280,9 @@ class Dataset_ETT_minute(Dataset):
         self.data_x = data[border1:border2]  # 输入数据
         self.data_y = data[border1:border2]  # 输出数据
         self.data_stamp = data_stamp  # 时间标记
+
+        print(f"Data range for {self.set_type}: {border1} to {border2}")
+        print(f"Data length: {len(self.data_x)}")
 
     def __getitem__(self, index):
         s_begin = index
@@ -286,6 +393,9 @@ class Dataset_Custom(Dataset):
         self.data_x = data[border1:border2]  # 输入数据
         self.data_y = data[border1:border2]  # 输出数据
         self.data_stamp = data_stamp  # 时间标记
+
+        print(f"Data range for {self.set_type}: {border1} to {border2}")
+        print(f"Data length: {len(self.data_x)}")
 
     def __getitem__(self, index):
         s_begin = index

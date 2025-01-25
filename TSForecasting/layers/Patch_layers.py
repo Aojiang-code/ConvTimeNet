@@ -1,6 +1,7 @@
 import torch, math
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 class BoxCoder(nn.Module):
 	def __init__(self, patch_count, patch_stride, patch_size, seq_len, channels, device='cuda:0'):
@@ -24,7 +25,8 @@ class BoxCoder(nn.Module):
 			x = i * self.patch_stride + 0.5 * (self.patch_size - 1)
 			anchors.append(x)
 
-		anchors = torch.as_tensor(anchors, device=device)
+		# anchors = torch.as_tensor(anchors, device=device)
+		anchors = torch.as_tensor(anchors, device='cpu')
 		self.register_buffer("anchor", anchors)
 
 	def forward(self, boxes):
@@ -55,7 +57,8 @@ class BoxCoder(nn.Module):
    
 	def meshgrid(self, boxes): # Input: pred_boxes. To get the sampling location
 		B, patch_count, C = boxes.shape[0], boxes.shape[1], boxes.shape[2]
-		channel_boxes = torch.zeros((boxes.shape[0], boxes.shape[1], 2)).to(self.device)
+		# channel_boxes = torch.zeros((boxes.shape[0], boxes.shape[1], 2)).to(self.device)
+		channel_boxes = torch.zeros((boxes.shape[0], boxes.shape[1], 2))
 		channel_boxes[:, :, 1] = 1.0
 		xs = boxes.view(B*patch_count, C, 2)
 		xs = torch.nn.functional.interpolate(xs, size=self.patch_size, mode='linear', align_corners=True)
@@ -148,7 +151,13 @@ class DepatchSampling(nn.Module):
 		B = img.shape[0]
 
 		sampling_locations, bound = self.get_sampling_location(X) # sampling_locations: [bs, patch_count, channel, patch_size, 2]
-		sampling_locations = sampling_locations.view(B, self.patch_count*self.in_feats, self.patch_size, 2)
+		
+		# 计算目标形状
+		target_shape = (B, self.patch_count * self.in_feats, self.patch_size, 2)
+		if np.prod(target_shape) != sampling_locations.numel():
+			raise ValueError(f"目标形状 {target_shape} 与输入大小 {sampling_locations.numel()} 不匹配")
+
+		sampling_locations = sampling_locations.view(*target_shape)
 
 		# print('sampling_locations: ', sampling_locations.shape)
 
