@@ -12,10 +12,10 @@ from layers.Patch_layers import *
 from layers.RevIN import RevIN
 
 def get_activation_fn(activation):
-    if callable(activation): return activation()
-    elif activation.lower() == "relu": return nn.ReLU()
-    elif activation.lower() == "gelu": return nn.GELU()
-    raise ValueError(f'{activation} is not available. You can use "relu", "gelu", or a callable') 
+    if callable(activation): return activation()  # 如果是可调用的，直接返回
+    elif activation.lower() == "relu": return nn.ReLU()  # ReLU激活函数
+    elif activation.lower() == "gelu": return nn.GELU()  # GELU激活函数
+    raise ValueError(f'{activation} is not available. You can use "relu", "gelu", or a callable')  # 如果不支持，抛出异常
 
 # Cell
 class ConvTimeNet_backbone(nn.Module):

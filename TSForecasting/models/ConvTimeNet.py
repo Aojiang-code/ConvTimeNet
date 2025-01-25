@@ -7,8 +7,7 @@ from layers.ConvTimeNet_backbone import ConvTimeNet_backbone
 
 # ConvTimeNet: depatch + batch norm + gelu + Conv + 2-layer-ffn(PointWise Conv + PointWise Conv)
 class Model(nn.Module):
-    def __init__(self, configs, norm:str='batch', act:str="gelu", head_type = 'flatten'):
-        
+    def __init__(self, configs, norm:str='batch', act:str="gelu", head_type='flatten'):
         super().__init__()
         
         # load parameters
