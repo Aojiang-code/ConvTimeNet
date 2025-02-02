@@ -25,7 +25,7 @@ parser.add_argument('--data', type=str, required=False, default='ETTh1', help='d
 parser.add_argument('--root_path', type=str, default='../dataset/', help='root path of the data file')  # 数据文件根路径
 # parser.add_argument('--root_path', type=str, default='E:/浏览器下载地址/宁海疾控食源性疾病/TimeNet/dataset/', help='root path of the data file')  # 数据文件根路径
 # parser.add_argument('--data_path', type=str, default='ETTh1.csv', help='data file')  # 数据文件名
-parser.add_argument('--data_path', type=str, default='people.csv', help='data file')  # 数据文件名
+parser.add_argument('--data_path', type=str, default='ETTh1.csv', help='data file')  # 数据文件名
 parser.add_argument('--features', type=str, default='M',
                     help='forecasting task, options:[M, S, MS]; M:multivariate predict multivariate, S:univariate predict univariate, MS:multivariate predict univariate')  # 预测任务类型
 parser.add_argument('--target', type=str, default='OT', help='target feature in S or MS task')  # 目标特征
