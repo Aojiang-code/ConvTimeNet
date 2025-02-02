@@ -69,30 +69,3 @@ class Model(nn.Module):
         x = x.permute(0, 2, 1)  # 恢复张量维度顺序
 
         return x  # 返回输出
-
-# 确保使用高效的数学库
-torch.set_num_threads(4)  # 设置线程数，具体数值可以根据CPU核心数调整
-
-# 使用float16数据类型
-model = Model(configs).half() # 将模型转换为float16
-input_data = input_data.half()  # 将输入数据转换为float16
-
-# 增加批量大小
-batch_size = 32  # 根据内存大小调整
-
-# 使用DataLoader的多线程加载
-data_loader = DataLoader(
-    dataset,
-    batch_size=batch_size,
-    shuffle=True,
-    num_workers=4  # 根据CPU核心数调整
-)
-
-# 在CPU上运行模型
-device = torch.device('cpu')
-model.to(device)
-input_data = input_data.to(device)
-
-# 前向传播
-with torch.no_grad():  # 禁用梯度计算以加速推理
-    output = model(input_data)
